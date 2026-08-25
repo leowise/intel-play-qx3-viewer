@@ -80,7 +80,6 @@ Use this if you are developing, or you do not have the `.exe`.
 | **Top / Bottom** | Stage lights (see below). |
 | **Gain / Exp** | Sensor gain and exposure. |
 | **Bright / Cont / Sat** | Colour adjustments. |
-| **Average frames** | Temporal denoise. Averages the last few live frames; helps at high magnification. Raise **Frames** for a cleaner (slightly more lagged) image. |
 | **Snapshot** | Save a still image (PNG or JPEG). |
 | **Record** | Start/stop AVI recording. |
 
