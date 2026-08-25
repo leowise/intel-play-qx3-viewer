@@ -9,6 +9,8 @@
 
 This project lets the discontinued 1999 Intel Play QX3 USB microscope work on modern 64-bit Windows 10 and Windows 11. The original Intel software and driver were 32-bit only; this viewer talks to the camera in user mode over WinUSB, with live preview, stage lights, snapshots, and video recording.
 
+The usual way to run it is a **single `.exe`**. It can install the USB driver (one administrator prompt) and start the viewer. Python is not required on the PC that runs the `.exe`.
+
 <table align="center">
   <tr>
     <td align="center">
@@ -42,37 +44,32 @@ This project lets the discontinued 1999 Intel Play QX3 USB microscope work on mo
 
 ## Quick Start
 
-### What you need
+### Option A — standalone `.exe` (recommended)
+
+No Python install. One file does driver setup and the viewer.
+
+1. Get **`IntelPlay-QX3.exe`**
+   - From a GitHub **Release**, or
+   - From this repo after you (or someone) ran **`build.bat`**: `dist\IntelPlay-QX3.exe`
+2. Plug in the microscope.
+3. Double-click **`IntelPlay-QX3.exe`**.
+4. The first time, Windows may ask for administrator permission so WinUSB can be installed. Click **Yes**.
+5. The viewer opens. Later launches skip the driver step.
+
+If Windows shows an unsigned-driver warning, choose **Install anyway**.
+
+### Option B — from this folder (Python)
+
+Use this if you are developing, or you do not have the `.exe`.
 
 - Windows 10 or Windows 11 (64-bit)
 - The Intel Play QX3 microscope and its USB cable
 - [Python 3.10 or newer](https://www.python.org/downloads/) (check **Add python.exe to PATH** during setup)
 
-### 1. Install Python (one time)
-
-1. Download Python from [python.org/downloads](https://www.python.org/downloads/).
-2. Run the installer.
-3. Check **Add python.exe to PATH**.
-4. Click **Install Now**.
-
-### 2. Install the USB driver (one time)
-
-The old Intel driver cannot be used on 64-bit Windows. This step binds Microsoft **WinUSB** to the microscope.
-
-1. Plug in the microscope.
-2. Double-click **`install-driver.bat`**.
-3. Click **Yes** on the Windows administrator prompt.
-4. Wait until it says WinUSB is ready.
-
-If Windows still asks whether to install a driver, choose **Install anyway**. The script only opens Zadig if automatic install cannot finish.
-
-### 3. Run the viewer
-
-1. Double-click **`run.bat`**.
-2. The first launch installs the Python packages, then opens the viewer.
-3. Later launches skip ahead and open the viewer directly.
-
-If the window says the microscope was not found, finish the driver step and unplug/replug the USB cable.
+1. Install Python from [python.org/downloads](https://www.python.org/downloads/) with **Add python.exe to PATH** checked.
+2. Plug in the microscope.
+3. Double-click **`install-driver.bat`**, then **Yes** on the administrator prompt.
+4. Double-click **`run.bat`**. The first launch installs Python packages, then opens the viewer.
 
 ## Using the viewer
 
@@ -82,6 +79,7 @@ If the window says the microscope was not found, finish the driver step and unpl
 | **Top / Bottom** | Stage lights (see below). |
 | **Gain / Exp** | Sensor gain and exposure. |
 | **Bright / Cont / Sat** | Colour adjustments. |
+| **Average frames** | Temporal denoise. Averages the last few live frames; helps at high magnification. Raise **Frames** for a cleaner (slightly more lagged) image. |
 | **Snapshot** | Save a still image (PNG or JPEG). |
 | **Record** | Start/stop AVI recording. |
 
@@ -102,25 +100,24 @@ Use the **Top** and **Bottom** checkboxes on the right. Both can be on at once. 
 
 1. Confirm it is plugged in (the USB cable powers the camera).
 2. Try another USB port on the PC itself, not a hub.
-3. Plug the microscope in, then run **`install-driver.bat`** as administrator.
+3. Plug the microscope in, then run **`IntelPlay-QX3.exe`** again (or **`install-driver.bat`** if you use the Python folder).
 4. In **Device Manager**, look for the device. After WinUSB it often appears under **Universal Serial Bus devices**.
-5. Unplug, wait 5 seconds, plug back in, then run **`run.bat`** again.
+5. Unplug, wait 5 seconds, plug back in, then start the viewer again.
 
 ### Windows will not install the driver / unsigned driver warning
 
-- Click **Yes** when `install-driver.bat` asks for administrator permission.
+- Click **Yes** when Windows asks for administrator permission.
 - If a Windows driver warning appears, choose **Install anyway**.
 - You do **not** need Test Signing.
 - Do not install the original 1999 `stvqx3` kernel driver on 64-bit Windows.
 
 ### Python was not found
 
-Install Python from [python.org](https://www.python.org/downloads/) and tick **Add python.exe to PATH**. Close and reopen `run.bat` after installing.
+If you are using **`IntelPlay-QX3.exe`**, Python is not required. If you are using **`run.bat`**, install Python from [python.org](https://www.python.org/downloads/) and tick **Add python.exe to PATH**.
 
 ### `pip` / package install failed
 
-- Connect to the internet and run `run.bat` again.
-- From a Command Prompt in this folder: `python -m pip install -r requirements.txt`
+Only applies to **`run.bat`**. Connect to the internet and run it again, or: `python -m pip install -r requirements.txt`
 
 ### Live video is black, frozen, or very slow
 
@@ -128,11 +125,15 @@ Install Python from [python.org](https://www.python.org/downloads/) and tick **A
 2. Raise **Gain** and **Exp**.
 3. Unplug other busy USB devices.
 4. After a resolution change, wait for **Please wait...** to clear.
-5. Unplug the microscope, plug it in again, and restart `run.bat`.
+5. Unplug the microscope, plug it in again, and restart the viewer.
 
 ### Lights do not turn on
 
 Power comes from USB. Use a direct port on the computer. Toggle **Top** / **Bottom** after the live image has started.
+
+## Building the `.exe` (developers)
+
+From this folder, double-click **`build.bat`**. The result is **`dist\IntelPlay-QX3.exe`** (often 70+ MB because OpenCV is bundled). That file is self-contained: driver install plus viewer. You can attach it to a GitHub Release; it is not committed to git.
 
 ## Repository layout
 
@@ -140,9 +141,14 @@ Power comes from USB. Use a direct port on the computer. Toggle **Top** / **Bott
 ├── README.md
 ├── LICENSE
 ├── requirements.txt
-├── run.bat                 Double-click to start
-├── install-driver.bat      Double-click once to install WinUSB
+├── IntelPlay-QX3.exe       After build.bat: dist\IntelPlay-QX3.exe
+├── run.bat                 Python launcher (optional)
+├── install-driver.bat      Python-folder WinUSB installer (optional)
+├── build.bat               Build the standalone .exe
+├── qx3.spec
+├── src/qx3_launch.py       .exe entry (driver + viewer)
 ├── src/qx3_gui.py
+├── src/winusb_install.py
 └── drivers/qx3_winusb.inf
 ```
 
