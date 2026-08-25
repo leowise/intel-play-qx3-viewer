@@ -9,6 +9,37 @@
 
 This project lets the discontinued 1999 Intel Play QX3 USB microscope work on modern 64-bit Windows 10 and Windows 11. The original Intel software and driver were 32-bit only; this viewer talks to the camera in user mode over WinUSB, with live preview, stage lights, snapshots, and video recording.
 
+<table align="center">
+  <tr>
+    <td align="center">
+      <img
+        src="https://github.com/user-attachments/assets/2a15f046-c4be-4d97-962e-e0ae55bc9ed7"
+        alt="QX3 snapshot at 10x"
+        width="220"
+      />
+    </td>
+    <td align="center">
+      <img
+        src="https://github.com/user-attachments/assets/e4703560-de0c-46f7-9010-aeb8f01598e5"
+        alt="QX3 snapshot at 60x"
+        width="220"
+      />
+    </td>
+    <td align="center">
+      <img
+        src="https://github.com/user-attachments/assets/e1b6eb7d-fd9c-4719-b312-5957984e17ee"
+        alt="QX3 snapshot at 200x"
+        width="220"
+      />
+    </td>
+  </tr>
+  <tr>
+    <td align="center"><strong>10×</strong></td>
+    <td align="center"><strong>60×</strong></td>
+    <td align="center"><strong>200×</strong></td>
+  </tr>
+</table>
+
 ## Quick Start
 
 ### What you need
