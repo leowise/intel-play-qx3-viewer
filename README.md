@@ -1,15 +1,18 @@
-# Standalone viewer and capture software for the Intel Play QX3/QX5 USB Microscope on 64-bit Windows 10/11
+# Standalone viewer and capture software for the Intel Play QX3 USB Microscope on 64-bit Windows 10/11
 
 [![Windows 10/11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows&logoColor=white)](https://www.microsoft.com/windows)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/rinum)
+[![Download](https://img.shields.io/github/v/release/Rinum/intel-play-qx3-viewer?label=Download%20.exe)](https://github.com/Rinum/intel-play-qx3-viewer/releases/download/v1.0.0/IntelPlay-QX3.exe)
 
 ## Overview
 
 This project lets the discontinued 1999 Intel Play QX3 USB microscope work on modern 64-bit Windows 10 and Windows 11. The original Intel software and driver were 32-bit only; this viewer talks to the camera in user mode over WinUSB, with live preview, stage lights, snapshots, and video recording.
 
 The usual way to run it is a **single `.exe`**. It can install the USB driver (one administrator prompt) and start the viewer. Python is not required on the PC that runs the `.exe`.
+
+**[Download IntelPlay-QX3.exe](https://github.com/Rinum/intel-play-qx3-viewer/releases/download/v1.0.0/IntelPlay-QX3.exe)** (v1.0.0)
 
 <table align="center">
   <tr>
@@ -48,9 +51,7 @@ The usual way to run it is a **single `.exe`**. It can install the USB driver (o
 
 No Python install. One file does driver setup and the viewer.
 
-1. Get **`IntelPlay-QX3.exe`**
-   - From a GitHub **Release**, or
-   - From this repo after you (or someone) ran **`build.bat`**: `dist\IntelPlay-QX3.exe`
+1. Download **[IntelPlay-QX3.exe](https://github.com/Rinum/intel-play-qx3-viewer/releases/download/v1.0.0/IntelPlay-QX3.exe)** (or build it locally with **`build.bat`**).
 2. Plug in the microscope.
 3. Double-click **`IntelPlay-QX3.exe`**.
 4. The first time, Windows may ask for administrator permission so WinUSB can be installed. Click **Yes**.
