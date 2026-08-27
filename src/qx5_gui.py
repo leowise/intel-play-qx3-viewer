@@ -21,11 +21,13 @@ from PIL import Image, ImageTk
 sys.path.insert(0, os.path.dirname(__file__))
 from qx3_gui import IsoPump, find_libusb_dll  # noqa: E402
 from qx5_driver import VID, PID, Mars97113, split_frames, decode_frame  # noqa: E402
+from qx5_capture import CaptureSession  # noqa: E402
 
 WIDTH, HEIGHT = 320, 240
 DISPLAY_SCALE = 2
 SHUTTER_FREQ_HZ = 1500
 SHUTTER_DURATION_MS = 80
+MEDIA_ROOT = "media"
 
 
 class QX5App(tk.Tk):
@@ -40,6 +42,7 @@ class QX5App(tk.Tk):
         self._rx_buf = b""
         self._last_image = None
         self._photo = None
+        self._capture_session = None
 
         self.led_top = tk.BooleanVar(value=False)
         self.led_bottom = tk.BooleanVar(value=False)
@@ -85,6 +88,33 @@ class QX5App(tk.Tk):
         tk.Button(controls, text="Snapshot", command=self._on_snapshot).pack(
             anchor="w", pady=(12, 0), fill="x"
         )
+
+        capture_frame = tk.LabelFrame(controls, text="Timed Capture")
+        capture_frame.pack(anchor="w", pady=(12, 0), fill="x")
+
+        tk.Label(capture_frame, text="Interval (seconds)").pack(anchor="w")
+        self.capture_interval = tk.StringVar(value="5")
+        tk.Entry(capture_frame, textvariable=self.capture_interval, width=10).pack(anchor="w")
+
+        tk.Label(capture_frame, text="Duration (minutes, 0 = use count)").pack(anchor="w")
+        self.capture_duration_min = tk.StringVar(value="0")
+        tk.Entry(capture_frame, textvariable=self.capture_duration_min, width=10).pack(anchor="w")
+
+        tk.Label(capture_frame, text="Frame count (used if duration = 0)").pack(anchor="w")
+        self.capture_count = tk.StringVar(value="60")
+        tk.Entry(capture_frame, textvariable=self.capture_count, width=10).pack(anchor="w")
+
+        self.capture_status = tk.Label(capture_frame, text="Idle")
+        self.capture_status.pack(anchor="w", pady=(4, 0))
+
+        btn_row = tk.Frame(capture_frame)
+        btn_row.pack(anchor="w", fill="x")
+        self.start_capture_btn = tk.Button(btn_row, text="Start", command=self._on_start_capture)
+        self.start_capture_btn.pack(side="left")
+        self.stop_capture_btn = tk.Button(
+            btn_row, text="Stop", command=self._on_stop_capture, state="disabled"
+        )
+        self.stop_capture_btn.pack(side="left")
 
     def _add_slider(self, parent, label, var, lo, hi, on_change):
         tk.Label(parent, text=label).pack(anchor="w", pady=(8, 0))
@@ -172,12 +202,85 @@ class QX5App(tk.Tk):
         from datetime import datetime
         path = os.path.join("media", f"snapshot_{datetime.now():%Y-%m-%d_%H-%M-%S}.png")
         self._last_image.save(path)
+        self._play_shutter_sound()
+
+    def _play_shutter_sound(self):
         try:
             winsound.Beep(SHUTTER_FREQ_HZ, SHUTTER_DURATION_MS)
         except RuntimeError:
             pass
 
+    def _on_start_capture(self):
+        if self._capture_session is not None and self._capture_session.is_running:
+            return
+        try:
+            interval_s = float(self.capture_interval.get())
+        except ValueError:
+            messagebox.showerror("Invalid interval", "Interval must be a number of seconds.")
+            return
+
+        duration_min = 0.0
+        try:
+            duration_min = float(self.capture_duration_min.get())
+        except ValueError:
+            messagebox.showerror("Invalid duration", "Duration must be a number of minutes.")
+            return
+
+        count = None
+        duration_s = None
+        if duration_min > 0:
+            duration_s = duration_min * 60.0
+        else:
+            try:
+                count = int(self.capture_count.get())
+            except ValueError:
+                messagebox.showerror("Invalid count", "Frame count must be a whole number.")
+                return
+            if count <= 0:
+                messagebox.showerror("Invalid count", "Frame count must be positive.")
+                return
+
+        os.makedirs(MEDIA_ROOT, exist_ok=True)
+        self._capture_session = CaptureSession(
+            MEDIA_ROOT, interval_s=interval_s, count=count, duration_s=duration_s,
+        )
+        self._capture_session.start(
+            self.get_current_frame,
+            extra_metadata={
+                "led_top": self.led_top.get(),
+                "led_bottom": self.led_bottom.get(),
+                "brightness": self.brightness.get(),
+                "saturation": self.saturation.get(),
+                "sharpness": self.sharpness.get(),
+                "gamma": self.gamma.get(),
+            },
+            on_frame_saved=self._play_shutter_sound,
+        )
+        self.capture_status.config(text="Capturing...")
+        self.start_capture_btn.config(state="disabled")
+        self.stop_capture_btn.config(state="normal")
+        self._poll_capture_status()
+
+    def _on_stop_capture(self):
+        if self._capture_session is not None:
+            self._capture_session.stop()
+        self.capture_status.config(text="Idle")
+        self.start_capture_btn.config(state="normal")
+        self.stop_capture_btn.config(state="disabled")
+
+    def _poll_capture_status(self):
+        if self._capture_session is None:
+            return
+        if not self._capture_session.is_running:
+            self.capture_status.config(text="Idle")
+            self.start_capture_btn.config(state="normal")
+            self.stop_capture_btn.config(state="disabled")
+            return
+        self.after(500, self._poll_capture_status)
+
     def _on_close(self):
+        if self._capture_session is not None and self._capture_session.is_running:
+            self._capture_session.stop()
         if self.pump is not None:
             self.pump.stop()
         if self.cam is not None:

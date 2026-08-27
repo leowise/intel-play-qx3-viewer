@@ -37,6 +37,7 @@ class CaptureSession:
         self._stop_event = threading.Event()
         self._running = False
         self._extra_metadata = {}
+        self._on_frame_saved = None
         self.session_dir = None
         self._frame_count = 0
         self._skipped = 0
@@ -47,7 +48,7 @@ class CaptureSession:
     def is_running(self):
         return self._running
 
-    def start(self, frame_provider, extra_metadata=None):
+    def start(self, frame_provider, extra_metadata=None, on_frame_saved=None):
         if self._running:
             raise RuntimeError("CaptureSession already running")
         self._stop_event.clear()
@@ -55,6 +56,7 @@ class CaptureSession:
         self._skipped = 0
         self._interrupted = False
         self._extra_metadata = dict(extra_metadata or {})
+        self._on_frame_saved = on_frame_saved
         self._started_at = datetime.now()
         folder_name = self._started_at.strftime("%Y-%m-%d_%H-%M-%S")
         self.session_dir = os.path.join(self.root_dir, folder_name)
@@ -90,6 +92,8 @@ class CaptureSession:
                     self._frame_count += 1
                     filename = f"frame_{self._frame_count:06d}.jpg"
                     frame.save(os.path.join(self.session_dir, filename), "JPEG")
+                    if self._on_frame_saved is not None:
+                        self._on_frame_saved()
                 else:
                     self._skipped += 1
 
