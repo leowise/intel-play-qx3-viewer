@@ -173,20 +173,24 @@ This chip is documented and has a full open-source Linux driver: [`drivers/media
 
 ### Status as of 2026-08-27
 
-Validated end-to-end against real hardware:
+`src/qx5_gui.py` is built and working, validated end-to-end against real hardware - the QX5 now has its own standalone tkinter viewer (run with `py -3 src/qx5_gui.py` from this folder; not yet wired into `run.bat` or the `.exe` build):
 
 - WinUSB binds cleanly to `093A:050F` (`drivers/qx5_winusb.inf`, `install-driver-qx5.bat`).
-- `src/qx5_probe.py` - descriptor dump, confirms pyusb/libusb sees the device (1 config, 1 interface, 9 alt settings scaling the isochronous packet size, plus bulk command/response and interrupt endpoints).
-- `src/qx5_bringup.py` - ported command layer (`Mars97113` class); sending the init sequence and the "top light on" command visibly lights the physical LED.
-- `src/qx5_frame_test.py` + `src/qx5_jpeg_header.py` - full capture-to-image pipeline: captures an isochronous stream, splits it into frames on the SOF marker, patches on a reconstructed JPEG header, and decodes with PIL. **86/86 captured frames decoded as valid, uncorrupted JPEGs at the correct 320x240 size**, with real image content (visible texture/lettering under the lens at 10x).
+- `src/qx5_driver.py` - the Mars97113 protocol module (ported from `mars.c`): device init, LED/brightness/saturation/sharpness/gamma register writes, isochronous frame splitting, and JPEG-header patch + decode. Unit tested (`tests/test_qx5_driver.py`).
+- `src/qx5_gui.py` - live preview (rendered at 2x on-screen for visibility on high-DPI displays; captures/snapshots stay at native 320x240), Top/Bottom light checkboxes, Brightness/Saturation/Sharpness/Gamma sliders, and a Snapshot button (with the same shutter-click sound as `qx3_gui.py`) - all confirmed working against the physical microscope.
+- Timed Capture panel: schedule a snapshot sequence by interval + either a frame count or a total duration, with a shutter click on every captured frame; each run is saved to its own `media/<timestamp>/` folder with `frame_*.jpg` stills, a `session.json` (settings + outcome), and (via OpenCV) a rendered `movie.mp4`. Scheduling logic lives in `src/qx5_capture.py`, independent of the GUI and unit tested (`tests/test_qx5_capture.py`).
+- Library window ("Library..." button): browse past capture sessions, play a session's `movie.mp4` in the OS's default video player, or open its folder in Explorer. Session listing lives in `src/qx5_library.py`, unit tested (`tests/test_qx5_library.py`, `tests/test_qx5_gui_library.py`).
 
-Known gap: images are currently underexposed (the sensor's default gain/exposure, baked into the fixed `mi_data` init block from `mars.c`, is conservative for typical ambient/LED lighting). This is a tuning problem, not a protocol problem.
+Known gaps:
+
+- The sensor's default gain/exposure, baked into the fixed `mi_data` init block from `mars.c`, is still conservative for typical ambient/LED lighting - the Brightness/Saturation/Sharpness/Gamma sliders help, but there is no dedicated exposure/gain control yet.
+- LED control is on/off only (no PWM/dimming register exists in the ported protocol) - the image adjustment sliders are the intended substitute for brightness control, not a missing feature.
 
 ### Next steps
 
-- Build `src/qx5_gui.py` (sibling to `qx3_gui.py`, reusing the existing `IsoPump` class) with live preview, lights, brightness/saturation/sharpness/gamma controls, and snapshot/record - the QX3 viewer's GUI shell can be adapted directly.
-- Tune exposure/gain so the live image isn't dim (may require sensor-specific register work beyond what `mars.c` exposes as a control, since the Linux driver doesn't model exposure as a user-facing knob either).
 - Confirm whether both illuminators can be lit simultaneously.
+- Package `qx5_gui.py` into a standalone `.exe` (mirrors the same packaging gap noted above for `qx3_gui.py`) and wire it into `run.bat`/`install-driver-qx5.bat`.
+- Consider backporting the timed-capture and library feature set into `qx3_gui.py` (explicitly out of scope for the work done so far).
 - An original QX5 install disk exists but only has a 32-bit driver, so it can't run on this 64-bit host directly; a 32-bit VM with USB passthrough plus USBPcap could capture authentic traffic later if anything above needs cross-checking, but wasn't needed for the work done so far.
 
 ## Disclaimer
