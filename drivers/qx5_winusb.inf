@@ -1,0 +1,36 @@
+;
+; WinUSB binding for Digital Blue QX5 (USB VID_093A&PID_050F, "1.3M PC-CAM")
+; Uses Microsoft's already-signed winusb.sys
+;
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = USBDevice
+ClassGuid   = {88BAE032-5A81-49f0-BC3D-A4FF138216D6}
+Provider    = %ManufacturerName%
+DriverVer   = 08/25/2026,1.0.0.0
+PnpLockdown = 1
+
+[Manufacturer]
+%ManufacturerName% = Standard,NTamd64
+
+[Standard.NTamd64]
+%DeviceName% = USB_Install, USB\VID_093A&PID_050F
+
+[USB_Install]
+Include = winusb.inf
+Needs   = WINUSB.NT
+
+[USB_Install.Services]
+Include = winusb.inf
+Needs   = WINUSB.NT.Services
+
+[USB_Install.HW]
+AddReg = USB_AddReg
+
+[USB_AddReg]
+HKR,,DeviceInterfaceGUIDs,0x00010000,"{88BAE032-5A81-49f0-BC3D-A4FF138216D6}"
+
+[Strings]
+ManufacturerName = "Intel Play QX5 Open Source"
+DeviceName = "Digital Blue QX5 Microscope"
