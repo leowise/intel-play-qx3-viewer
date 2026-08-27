@@ -22,12 +22,59 @@ sys.path.insert(0, os.path.dirname(__file__))
 from qx3_gui import IsoPump, find_libusb_dll  # noqa: E402
 from qx5_driver import VID, PID, Mars97113, split_frames, decode_frame  # noqa: E402
 from qx5_capture import CaptureSession  # noqa: E402
+from qx5_library import list_sessions  # noqa: E402
 
 WIDTH, HEIGHT = 320, 240
 DISPLAY_SCALE = 2
 SHUTTER_FREQ_HZ = 1500
 SHUTTER_DURATION_MS = 80
 MEDIA_ROOT = "media"
+
+
+class LibraryWindow(tk.Toplevel):
+    def __init__(self, master, media_root=MEDIA_ROOT):
+        super().__init__(master)
+        self.title("Capture Library")
+        self.media_root = media_root
+        self.sessions = []
+
+        self.listbox = tk.Listbox(self, width=50, height=15)
+        self.listbox.grid(row=0, column=0, columnspan=3, padx=8, pady=8)
+
+        tk.Button(self, text="Refresh", command=self.refresh).grid(row=1, column=0, padx=8, pady=(0, 8))
+        tk.Button(self, text="Play", command=self._on_play).grid(row=1, column=1, padx=8, pady=(0, 8))
+        tk.Button(self, text="Open Folder", command=self._on_open_folder).grid(row=1, column=2, padx=8, pady=(0, 8))
+
+        self.refresh()
+
+    def refresh(self):
+        self.sessions = list_sessions(self.media_root)
+        self.listbox.delete(0, tk.END)
+        for s in self.sessions:
+            label = f"{s.name}  ({s.frame_count} frames)"
+            if s.video_render_failed:
+                label += "  [frames only, render failed]"
+            elif s.movie_path is None:
+                label += "  [no video]"
+            self.listbox.insert(tk.END, label)
+
+    def _selected_session(self):
+        selection = self.listbox.curselection()
+        if not selection:
+            return None
+        return self.sessions[selection[0]]
+
+    def _on_play(self):
+        session = self._selected_session()
+        if session is None or session.movie_path is None:
+            return
+        os.startfile(session.movie_path)
+
+    def _on_open_folder(self):
+        session = self._selected_session()
+        if session is None:
+            return
+        os.startfile(session.path)
 
 
 class QX5App(tk.Tk):
@@ -115,6 +162,10 @@ class QX5App(tk.Tk):
             btn_row, text="Stop", command=self._on_stop_capture, state="disabled"
         )
         self.stop_capture_btn.pack(side="left")
+
+        tk.Button(controls, text="Library...", command=self._open_library).pack(
+            anchor="w", pady=(12, 0), fill="x"
+        )
 
     def _add_slider(self, parent, label, var, lo, hi, on_change):
         tk.Label(parent, text=label).pack(anchor="w", pady=(8, 0))
@@ -277,6 +328,9 @@ class QX5App(tk.Tk):
             self.stop_capture_btn.config(state="disabled")
             return
         self.after(500, self._poll_capture_status)
+
+    def _open_library(self):
+        LibraryWindow(self, media_root=MEDIA_ROOT)
 
     def _on_close(self):
         if self._capture_session is not None and self._capture_session.is_running:
