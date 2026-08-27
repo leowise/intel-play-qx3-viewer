@@ -4,7 +4,6 @@ patch on a synthetic JPEG header, decode, and save a few PNGs so we can
 look at real captured images.
 """
 
-import io
 import os
 import sys
 import time
@@ -12,36 +11,14 @@ import time
 import usb.core
 import usb.util
 import usb.backend.libusb1 as usb_libusb1
-from PIL import Image
 
 sys.path.insert(0, os.path.dirname(__file__))
 from qx3_gui import IsoPump, find_libusb_dll  # noqa: E402
-from qx5_bringup import Mars97113  # noqa: E402
-from qx5_jpeg_header import make_header  # noqa: E402
+from qx5_driver import Mars97113, split_frames, decode_frame  # noqa: E402
 
 VID = 0x093A
 PID = 0x050F
-MARKER = bytes([0xff, 0xff, 0x00, 0xff, 0x96])
 OUT_DIR = sys.argv[1] if len(sys.argv) > 1 else "."
-
-
-def split_frames(buf):
-    boundaries = []
-    i = 0
-    n = len(buf)
-    while i < n - 6:
-        if buf[i:i + 5] == MARKER and buf[i + 5] in (0x64, 0x65, 0x66, 0x67):
-            boundaries.append(i)
-            i += 16
-        else:
-            i += 1
-    frames = []
-    for k in range(len(boundaries) - 1):
-        start = boundaries[k] + 16
-        end = boundaries[k + 1]
-        if end > start:
-            frames.append(bytes(buf[start:end]))
-    return frames, boundaries
 
 
 def main():
@@ -83,17 +60,11 @@ def main():
     for i, f in enumerate(frames[:5]):
         print(f"  frame {i}: {len(f)} raw scan bytes")
 
-    header = make_header(height, width, quality=50, samples_y=0x21)
-    print(f"\nJPEG header: {len(header)} bytes")
-
     ok = 0
     os.makedirs(OUT_DIR, exist_ok=True)
     for i, f in enumerate(frames):
-        jpg = header + f + b"\xff\xd9"
         try:
-            img = Image.open(io.BytesIO(jpg))
-            img.load()
-            img = img.convert("RGB")
+            img = decode_frame(f, width=width, height=height)
             if ok < 5:
                 path = os.path.join(OUT_DIR, f"qx5_frame_{ok}.png")
                 img.save(path)
