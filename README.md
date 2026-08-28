@@ -36,6 +36,10 @@ test command is:
 - **Library**: browse saved sessions, inspect thumbnails, play available
   movies, or open the session folder.
 
+The viewer persists the current image and illuminator settings in the local
+`settings.json` file. It is ignored by Git and restored automatically on the
+next launch.
+
 The stream indicator distinguishes waiting for frames, live data, stale data,
 bad decoded frames, and transport errors. A capture never treats an old frame
 as a new observation.

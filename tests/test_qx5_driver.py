@@ -80,6 +80,35 @@ class TestMars97113(unittest.TestCase):
         with self.assertRaises(ValueError):
             camera.set_brightness(31)
 
+    def test_sharpness_uses_reference_range_and_encoding(self):
+        class FakeDevice:
+            def __init__(self):
+                self.writes = []
+
+            def write(self, _endpoint, data, timeout=None):
+                self.writes.append((bytes(data), timeout))
+
+        device = FakeDevice()
+        camera = Mars97113(device)
+        camera.set_sharpness(0)
+        camera.set_sharpness(1)
+        camera.set_sharpness(2)
+
+        self.assertEqual(device.writes, [
+            (b"\x67\x03", 500),
+            (b"\x67\x07", 500),
+            (b"\x67\x0b", 500),
+        ])
+
+    def test_sharpness_rejects_values_outside_reference_range(self):
+        class FakeDevice:
+            def write(self, *_args, **_kwargs):
+                raise AssertionError("invalid sharpness should not be sent")
+
+        camera = Mars97113(FakeDevice())
+        with self.assertRaises(ValueError):
+            camera.set_sharpness(3)
+
     def test_illuminators_reject_ambiguous_both_on_state(self):
         class FakeDevice:
             def write(self, *_args, **_kwargs):

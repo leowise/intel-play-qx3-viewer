@@ -54,6 +54,7 @@ class TestLibraryWindow(unittest.TestCase):
         self.assertEqual(win.sessions[0].name, "2026-08-27_11-00-00")
         self.assertEqual(win.sessions[1].name, "2026-08-27_10-00-00")
         self.assertEqual(win.listbox.size(), 2)
+        self.assertIn("movie.mp4", win.listbox.get(1))
         win.destroy()
 
     def test_refresh_on_empty_media_root(self):
@@ -61,6 +62,22 @@ class TestLibraryWindow(unittest.TestCase):
         win.refresh()
         self.assertEqual(win.sessions, [])
         self.assertEqual(win.listbox.size(), 0)
+        win.destroy()
+
+    def test_refresh_discovers_new_session_and_preserves_selection(self):
+        _write_session(self.media_root, "2026-08-28_10-00-00", frame_count=1)
+
+        win = LibraryWindow(self.root, media_root=self.media_root)
+        win.listbox.selection_set(0)
+        win._on_selection_changed()
+
+        _write_session(self.media_root, "2026-08-28_11-00-00", frame_count=2)
+        win.refresh()
+
+        self.assertEqual(len(win.sessions), 2)
+        self.assertEqual(win.listbox.curselection(), (1,))
+        self.assertEqual(win.sessions[win.listbox.curselection()[0]].name,
+                         "2026-08-28_10-00-00")
         win.destroy()
 
 

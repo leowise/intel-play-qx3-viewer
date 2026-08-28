@@ -19,6 +19,7 @@ PID = 0x050F
 MARKER = bytes([0xff, 0xff, 0x00, 0xff, 0x96])
 MIN_RAW_SCAN_BYTES = 64
 BRIGHTNESS_MAX = 30
+SHARPNESS_MAX = 2
 
 # mi_data from mars.c - default MI sensor register values
 MI_DATA = bytes([
@@ -57,7 +58,13 @@ class Mars97113:
         self.reg_w([0x06, (val * 0x40) & 0xFF])
 
     def set_sharpness(self, val):
-        self.reg_w([0x67, (val * 4 + 3) & 0xFF])
+        self.reg_w([0x67, self._encode_sharpness(val)])
+
+    @staticmethod
+    def _encode_sharpness(value):
+        if not isinstance(value, int) or not 0 <= value <= SHARPNESS_MAX:
+            raise ValueError(f"sharpness must be an integer from 0 to {SHARPNESS_MAX}")
+        return value * 4 + 3
 
     def set_illuminators(self, top=False, bottom=False):
         if top and bottom:
@@ -72,6 +79,7 @@ class Mars97113:
 
     def start(self, width=320, height=240, gamma=1, saturation=200, brightness=15, sharpness=1):
         brightness_register = self._encode_brightness(brightness)
+        sharpness_register = self._encode_sharpness(sharpness)
         self.reg_w([0x01, 0x01])
 
         self.reg_w([
@@ -100,7 +108,7 @@ class Mars97113:
             0x00,
         ])
 
-        self.reg_w([0x67, (sharpness * 4 + 3) & 0xFF, 0x14])
+        self.reg_w([0x67, sharpness_register, 0x14])
         self.reg_w([0x69, 0x2f, 0x28, 0x42])
         self.reg_w([0x63, 0x07])
 
