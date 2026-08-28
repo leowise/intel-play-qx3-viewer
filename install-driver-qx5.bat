@@ -154,7 +154,7 @@ if ($ok -or $winusb) {
     if ($reboot) {
         Write-Host "Windows asked for a reboot. Reboot if the viewer cannot see the camera."
     }
-    Write-Host "Next: run the descriptor probe script."
+    Write-Host "Next: run run-qx5.bat to start the QX5 viewer."
     exit 0
 }
 

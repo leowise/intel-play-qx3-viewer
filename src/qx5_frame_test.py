@@ -10,10 +10,9 @@ import time
 
 import usb.core
 import usb.util
-import usb.backend.libusb1 as usb_libusb1
 
 sys.path.insert(0, os.path.dirname(__file__))
-from qx3_gui import IsoPump, find_libusb_dll  # noqa: E402
+from usb_transport import IsoPump, get_libusb_backend  # noqa: E402
 from qx5_driver import Mars97113, split_frames, decode_frame  # noqa: E402
 
 VID = 0x093A
@@ -23,8 +22,7 @@ OUT_DIR = sys.argv[1] if len(sys.argv) > 1 else "."
 
 def main():
     width, height = 320, 240
-    dll = find_libusb_dll()
-    backend = usb_libusb1.get_backend(find_library=lambda x: dll)
+    backend = get_libusb_backend()
     dev = usb.core.find(idVendor=VID, idProduct=PID, backend=backend)
     if dev is None:
         print("Device not found.")

@@ -4,7 +4,13 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from qx5_driver import split_frames, decode_frame, MARKER
+from qx5_driver import (
+    FrameDecodeError,
+    Mars97113,
+    split_frames,
+    decode_frame,
+    MARKER,
+)
 
 
 def _sync(type_byte):
@@ -34,16 +40,53 @@ class TestSplitFrames(unittest.TestCase):
 
 
 class TestDecodeFrame(unittest.TestCase):
-    def test_garbage_data_still_decodes_to_requested_size(self):
-        # libjpeg tolerates malformed/empty entropy data - it fills in
-        # rather than raising, so decode_frame never throws on bad bytes.
-        img = decode_frame(b"not a jpeg at all", width=320, height=240)
-        self.assertEqual(img.size, (320, 240))
-        self.assertEqual(img.mode, "RGB")
+    def test_empty_or_short_scan_is_rejected(self):
+        with self.assertRaises(FrameDecodeError):
+            decode_frame(b"not a jpeg at all", width=320, height=240)
+
+        with self.assertRaises(FrameDecodeError):
+            decode_frame(b"\x00" * 63, width=320, height=240)
 
     def test_wrong_input_type_raises(self):
         with self.assertRaises(TypeError):
             decode_frame(None, width=320, height=240)
+
+
+class TestMars97113(unittest.TestCase):
+    def test_brightness_uses_user_facing_direction(self):
+        class FakeDevice:
+            def __init__(self):
+                self.writes = []
+
+            def write(self, _endpoint, data, timeout=None):
+                self.writes.append((bytes(data), timeout))
+
+        device = FakeDevice()
+        camera = Mars97113(device)
+        camera.set_brightness(0)
+        camera.set_brightness(30)
+
+        self.assertEqual(device.writes, [
+            (b"\x61\x1e", 500),
+            (b"\x61\x00", 500),
+        ])
+
+    def test_brightness_rejects_values_outside_hardware_range(self):
+        class FakeDevice:
+            def write(self, *_args, **_kwargs):
+                raise AssertionError("invalid brightness should not be sent")
+
+        camera = Mars97113(FakeDevice())
+        with self.assertRaises(ValueError):
+            camera.set_brightness(31)
+
+    def test_illuminators_reject_ambiguous_both_on_state(self):
+        class FakeDevice:
+            def write(self, *_args, **_kwargs):
+                raise AssertionError("ambiguous command should not be sent")
+
+        with self.assertRaises(ValueError):
+            Mars97113(FakeDevice()).set_illuminators(top=True, bottom=True)
 
 
 if __name__ == "__main__":

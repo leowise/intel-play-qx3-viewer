@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """QX5 (093A:050F) exploratory probe, take 2: use the same raw-libusb
-isochronous pump as the QX3 code (pyusb's high-level iso_read() mis-derives
-packet size across alt settings), just to see whether the camera streams
+isochronous pump (pyusb's high-level iso_read() mis-derives packet size across
+alt settings), just to see whether the camera streams
 data with no vendor commands sent at all.
 """
 
@@ -11,10 +11,9 @@ import time
 
 import usb.core
 import usb.util
-import usb.backend.libusb1 as usb_libusb1
 
 sys.path.insert(0, os.path.dirname(__file__))
-from qx3_gui import IsoPump, find_libusb_dll  # noqa: E402
+from usb_transport import IsoPump, get_libusb_backend  # noqa: E402
 
 VID = 0x093A
 PID = 0x050F
@@ -26,8 +25,7 @@ def hexdump(data, n=48):
 
 
 def main():
-    dll = find_libusb_dll()
-    backend = usb_libusb1.get_backend(find_library=lambda x: dll)
+    backend = get_libusb_backend()
     dev = usb.core.find(idVendor=VID, idProduct=PID, backend=backend)
     if dev is None:
         print("Device not found.")

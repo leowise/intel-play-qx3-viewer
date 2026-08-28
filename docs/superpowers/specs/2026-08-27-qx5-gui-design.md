@@ -12,23 +12,21 @@ is unattended timed snapshot sequences of a saltwater aquarium (sand-grain
 scale wildlife), later replayed as a composed video. Live view, LED control,
 and image adjustment exist to set up a good sequence, not as the end goal.
 
-This mirrors the original 1999 QX3/QX5 software's core workflow (live view →
-timed sequence → library → play back "the movie"), which the actual original
-driver/app cannot run on this machine (32-bit kernel-mode driver, hard
-architectural block on 64-bit Windows — see prior investigation). This build
-is an independent reimplementation, not a port of the original binary.
+This follows the original microscope software's core workflow (live view →
+timed sequence → library → play back "the movie"). This build is an
+independent reimplementation, not a port of the original binary.
 
 ## Stack decision
 
-**tkinter**, matching `qx3_gui.py`. Considered PySide6/Qt for nicer widgets
+**tkinter**. Considered PySide6/Qt for nicer widgets
 and native video playback, but rejected: none of the required features
 (LED control, timed capture, library, movie playback) actually need Qt once
 playback is delegated to the OS's default video player (see Library below).
-tkinter needs zero new dependencies and reuses the existing
-`IsoPump`/PIL/`ImageTk` frame-delivery pattern from `qx3_gui.py` directly.
+tkinter needs zero new dependencies and uses the shared `IsoPump` transport
+plus PIL/`ImageTk` for frame delivery.
 The actual future-proofing is architectural, not toolkit-based: the capture
 scheduler and library are separate, GUI-agnostic modules a future rewrite
-(Qt, or backporting to QX3) could reuse without change.
+ (Qt or another shell) could reuse without change.
 
 ## Components
 
@@ -81,9 +79,9 @@ Filesystem/JSON only, no GUI:
 
 ### `src/qx5_gui.py` (new)
 
-The tkinter shell, structured like `qx3_gui.py`:
+The tkinter shell:
 
-- Live view: `IsoPump` (from `qx3_gui.py`) feeds isochronous data, split on
+- Live view: shared `IsoPump` feeds isochronous data, split on
   the SOF marker, header-patched (`qx5_jpeg_header.py`), decoded with PIL,
   blitted to a `Canvas` via `ImageTk` on the existing polling-loop pattern.
 - Controls: Top/Bottom LED checkboxes (on/off), Brightness/Contrast*/
@@ -131,11 +129,7 @@ has none) — captures are personal data, not project source.
 
 ## Out of scope for this build
 
-- QX3 (`qx3_gui.py`) does not get this feature set yet. The scheduler/
-  library modules are written generically enough to be wired into
-  `qx3_gui.py` later as a separate, smaller follow-up.
 - True LED dimming is not pursued — the ported protocol has no PWM
   register for it; image brightness/gamma is the intended substitute
   (per user decision).
-- No packaged `.exe` build for `qx5_gui.py` in this pass (mirrors the
-  existing gap for `qx3_gui.py` noted in the README).
+- No packaged `.exe` build for `qx5_gui.py` in this pass.

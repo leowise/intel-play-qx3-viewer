@@ -57,6 +57,8 @@ class TestListSessions(unittest.TestCase):
         s = sessions[0]
         self.assertEqual(s.name, "2026-08-27_10-00-00")
         self.assertEqual(s.frame_count, 2)
+        self.assertEqual(s.duration_s, 300.0)
+        self.assertIsNone(s.termination_reason)
         self.assertIsNotNone(s.thumbnail_path)
         self.assertTrue(s.thumbnail_path.endswith("frame_000001.jpg"))
         self.assertIsNotNone(s.movie_path)
@@ -77,6 +79,24 @@ class TestListSessions(unittest.TestCase):
         self.assertEqual(len(sessions), 1)
         self.assertIsNone(sessions[0].movie_path)
         self.assertTrue(sessions[0].video_render_failed)
+
+    def test_missing_movie_and_malformed_frame_count_are_safe(self):
+        _write_session(
+            self.root, "2026-08-27_12-00-00",
+            {
+                "frame_count": "not-a-number",
+                "movie_filename": "..\\outside.mp4",
+                "interrupted": True,
+                "termination_reason": "error",
+                "error": "capture failed",
+            },
+            frame_names=["frame_000001.jpg"],
+        )
+        session = list_sessions(self.root)[0]
+        self.assertEqual(session.frame_count, 0)
+        self.assertIsNone(session.movie_path)
+        self.assertEqual(session.termination_reason, "error")
+        self.assertEqual(session.error, "capture failed")
 
     def test_sessions_sorted_newest_first(self):
         _write_session(self.root, "2026-08-27_09-00-00", {"frame_count": 0})

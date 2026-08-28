@@ -3,9 +3,8 @@
 
 Ported from Linux's gspca_mars driver
 (drivers/media/usb/gspca/mars.c) - the authoritative reference for this
-chip's command set. No vendor control transfers, unlike the QX3's CPiA
-protocol: every command is a byte sequence written to bulk-OUT endpoint
-0x04.
+chip's command set. Every command is a byte sequence written to bulk-OUT
+endpoint 0x04.
 """
 
 import io
@@ -18,6 +17,8 @@ VID = 0x093A
 PID = 0x050F
 
 MARKER = bytes([0xff, 0xff, 0x00, 0xff, 0x96])
+MIN_RAW_SCAN_BYTES = 64
+BRIGHTNESS_MAX = 30
 
 # mi_data from mars.c - default MI sensor register values
 MI_DATA = bytes([
@@ -38,8 +39,16 @@ class Mars97113:
     def mi_w(self, addr, value):
         self.reg_w([0x1f, 0x00, addr, value])
 
+    @staticmethod
+    def _encode_brightness(value):
+        if not isinstance(value, int) or not 0 <= value <= BRIGHTNESS_MAX:
+            raise ValueError(f"brightness must be an integer from 0 to {BRIGHTNESS_MAX}")
+        # The camera's register direction is opposite to the user-facing
+        # brightness scale: a lower UI value produces a brighter image.
+        return BRIGHTNESS_MAX - value
+
     def set_brightness(self, val):
-        self.reg_w([0x61, val])
+        self.reg_w([0x61, self._encode_brightness(val)])
 
     def set_colors(self, saturation):
         self.reg_w([0x5f, (saturation << 3) & 0xFF, ((saturation >> 2) & 0xf8) | 0x04])
@@ -51,6 +60,8 @@ class Mars97113:
         self.reg_w([0x67, (val * 4 + 3) & 0xFF])
 
     def set_illuminators(self, top=False, bottom=False):
+        if top and bottom:
+            raise ValueError("QX5 illuminators are modeled as mutually exclusive")
         if top:
             b = 0x76
         elif bottom:
@@ -60,6 +71,7 @@ class Mars97113:
         self.reg_w([0x22, b])
 
     def start(self, width=320, height=240, gamma=1, saturation=200, brightness=15, sharpness=1):
+        brightness_register = self._encode_brightness(brightness)
         self.reg_w([0x01, 0x01])
 
         self.reg_w([
@@ -84,7 +96,7 @@ class Mars97113:
             0x00,
             (saturation << 3) & 0xFF,
             ((saturation >> 2) & 0xf8) | 0x04,
-            brightness,
+            brightness_register,
             0x00,
         ])
 
@@ -99,6 +111,10 @@ class Mars97113:
 
     def stop(self):
         self.reg_w([0x01, 0x00])
+
+
+class FrameDecodeError(ValueError):
+    """Raised when a raw QX5 scan cannot be trusted as a complete frame."""
 
 
 def split_frames(buf):
@@ -129,16 +145,29 @@ def split_frames(buf):
 
 
 def decode_frame(raw_scan, width=320, height=240, quality=50, samples_y=0x21):
-    """Patch a synthetic JPEG header onto raw MR97113 scan data and decode.
+    """Patch a synthetic JPEG header onto raw MR97113 scan data and decode."""
+    if not isinstance(raw_scan, (bytes, bytearray, memoryview)):
+        raise TypeError("raw_scan must be bytes-like")
+    if width <= 0 or height <= 0:
+        raise ValueError("frame dimensions must be positive")
 
-    libjpeg tolerates malformed/truncated entropy-coded data - garbage or
-    even empty raw_scan still decodes to a (visually corrupted) Image of
-    the requested size rather than raising. Only a genuinely wrong input
-    type (e.g. None instead of bytes) raises. Callers streaming live
-    frames should not rely on exceptions to detect a bad frame.
-    """
+    raw_scan = bytes(raw_scan)
+    if len(raw_scan) < MIN_RAW_SCAN_BYTES:
+        raise FrameDecodeError("raw JPEG scan is too short")
+
     header = make_header(height, width, quality=quality, samples_y=samples_y)
     jpg_bytes = header + raw_scan + b"\xff\xd9"
-    img = Image.open(io.BytesIO(jpg_bytes))
-    img.load()
-    return img.convert("RGB")
+    try:
+        with Image.open(io.BytesIO(jpg_bytes)) as img:
+            if img.size != (width, height):
+                raise FrameDecodeError(
+                    f"decoded frame size {img.size} does not match {(width, height)}"
+                )
+            img.verify()
+        with Image.open(io.BytesIO(jpg_bytes)) as img:
+            img.load()
+            return img.convert("RGB")
+    except FrameDecodeError:
+        raise
+    except (OSError, SyntaxError) as exc:
+        raise FrameDecodeError(f"invalid JPEG scan: {exc}") from exc

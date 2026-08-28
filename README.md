@@ -1,141 +1,94 @@
-# Standalone viewer and capture software for the Intel Play QX3 USB Microscope on 64-bit Windows 10/11
+# Digital Blue QX5 Scope
 
-[![Windows 10/11](https://img.shields.io/badge/Windows-10%20%2F%2011-0078D6?logo=windows&logoColor=white)](https://www.microsoft.com/windows)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/rinum)
-[![Download](https://img.shields.io/github/v/release/Rinum/intel-play-qx3-viewer?label=Download%20.exe)](https://github.com/Rinum/intel-play-qx3-viewer/releases/download/v1.0.0/IntelPlay-QX3.exe)
+Windows viewer and timed-capture software for the Digital Blue QX5 USB
+microscope. The application talks to the camera in user mode through WinUSB
+and supports live preview, illuminator control, snapshots, timed capture, and
+a capture library.
 
-## Overview
+## Quick start
 
-This project lets the discontinued 1999 Intel Play QX3 USB microscope work on modern 64-bit Windows 10 and Windows 11. The original Intel software and driver were 32-bit only; this viewer talks to the camera in user mode over WinUSB, with live preview, stage lights, snapshots, and video recording.
+Requirements:
 
-The usual way to run it is a **single `.exe`**. It can install the USB driver (one administrator prompt) and start the viewer. Python is not required on the PC that runs the `.exe`.
+- Windows 10 or Windows 11, 64-bit
+- A Digital Blue QX5 microscope and USB cable
+- Python 3.10 or newer
 
-**[Download IntelPlay-QX3.exe](https://github.com/Rinum/intel-play-qx3-viewer/releases/download/v1.0.0/IntelPlay-QX3.exe)** (v1.0.0)
-
-<table align="center">
-  <tr>
-    <td align="center">
-      <img
-        src="https://github.com/user-attachments/assets/2a15f046-c4be-4d97-962e-e0ae55bc9ed7"
-        alt="QX3 snapshot at 10x"
-        width="220"
-      />
-    </td>
-    <td align="center">
-      <img
-        src="https://github.com/user-attachments/assets/e4703560-de0c-46f7-9010-aeb8f01598e5"
-        alt="QX3 snapshot at 60x"
-        width="220"
-      />
-    </td>
-    <td align="center">
-      <img
-        src="https://github.com/user-attachments/assets/e1b6eb7d-fd9c-4719-b312-5957984e17ee"
-        alt="QX3 snapshot at 200x"
-        width="220"
-      />
-    </td>
-  </tr>
-  <tr>
-    <td align="center"><strong>10×</strong></td>
-    <td align="center"><strong>60×</strong></td>
-    <td align="center"><strong>200×</strong></td>
-  </tr>
-</table>
-
-## Quick Start
-
-### Option A — standalone `.exe` (recommended)
-
-No Python install. One file does driver setup and the viewer.
-
-1. Download **[IntelPlay-QX3.exe](https://github.com/Rinum/intel-play-qx3-viewer/releases/download/v1.0.0/IntelPlay-QX3.exe)** (or build it locally with **`build.bat`**).
+1. Install Python and ensure `python.exe` is available on `PATH`.
 2. Plug in the microscope.
-3. Double-click **`IntelPlay-QX3.exe`**.
-4. The first time, Windows may ask for administrator permission so WinUSB can be installed. Click **Yes**.
-5. The viewer opens. Later launches skip the driver step.
+3. Run `install-driver-qx5.bat` as administrator once to bind WinUSB.
+4. Double-click `run.bat` or `run-qx5.bat`.
 
-If Windows shows an unsigned-driver warning, choose **Install anyway**.
+The launcher uses the repository `.venv`, creates it when needed, and installs
+the dependencies from `requirements.txt`. For development, the recommended
+test command is:
 
-### Option B — from this folder (Python)
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
 
-Use this if you are developing, or you do not have the `.exe`.
+## Viewer controls
 
-- Windows 10 or Windows 11 (64-bit)
-- The Intel Play QX3 microscope and its USB cable
-- [Python 3.10 or newer](https://www.python.org/downloads/) (check **Add python.exe to PATH** during setup)
+- **Top light / Bottom light**: select the QX5 illuminator. The controls are
+  mutually exclusive until simultaneous operation is confirmed on hardware.
+- **Brightness, Saturation, Sharpness, Gamma**: adjust the camera image.
+- **Snapshot**: save the latest native 320x240 frame under `media/`.
+- **Timed Capture**: save a count-based or duration-based sequence.
+- **Library**: browse saved sessions, inspect thumbnails, play available
+  movies, or open the session folder.
 
-1. Install Python from [python.org/downloads](https://www.python.org/downloads/) with **Add python.exe to PATH** checked.
-2. Plug in the microscope.
-3. Double-click **`install-driver.bat`**, then **Yes** on the administrator prompt.
-4. Double-click **`run.bat`**. The first launch installs Python packages, then opens the viewer.
+The stream indicator distinguishes waiting for frames, live data, stale data,
+bad decoded frames, and transport errors. A capture never treats an old frame
+as a new observation.
 
-## Using the viewer
+## Capture sessions
 
-| Control | What it does |
-| --- | --- |
-| **Resolution** | Capture size. `704x576 (Full CIF interpolated)` uses the whole sensor and upscales it. `512x384 (Intel Play interpolated)` matches the original Intel software. |
-| **Top / Bottom** | Stage lights (see below). |
-| **Gain / Exp** | Sensor gain and exposure. |
-| **Bright / Cont / Sat** | Colour adjustments. |
-| **Snapshot** | Save a still image (PNG or JPEG). |
-| **Record** | Start/stop AVI recording. |
+Each run is stored under `media/<timestamp>/` and contains:
 
-Changing resolution shows **Please wait...** until the first full frame at the new size arrives.
+- `frame_*.jpg` still images
+- `session.json` with settings, timing, frame counts, termination reason, and
+  error details when applicable
+- `movie.mp4` when OpenCV rendering succeeds
 
-## Stage lighting
+Still frames and `session.json` remain the authoritative record if video
+rendering fails. Interrupted or incomplete sessions remain discoverable when
+metadata can be written.
 
-The QX3 has two illuminators:
+## Hardware and protocol
 
-- **Top** — upper / reflected light (for opaque objects)
-- **Bottom** — transmitted light through the stage (for slides)
+The QX5 enumerates as USB `093A:050F` and uses a PixArt / Mars-Semi MR97113
+JPEG webcam ASIC. Commands are written to bulk-OUT endpoint `0x04`; image data
+arrives as raw JPEG scan data over an isochronous endpoint. The viewer adds the
+required JPEG header before decoding each complete frame.
 
-Use the **Top** and **Bottom** checkboxes on the right. Both can be on at once. If a light does not change, unplug the microscope, plug it back in, and click the checkbox again.
+The protocol implementation is based on the Linux kernel's
+[`gspca_mars`](https://github.com/torvalds/linux/blob/master/drivers/media/usb/gspca/mars.c)
+driver.
 
 ## Troubleshooting
 
-### The viewer says the microscope was not found
+### The camera is not found
 
-1. Confirm it is plugged in (the USB cable powers the camera).
-2. Try another USB port on the PC itself, not a hub.
-3. Plug the microscope in, then run **`IntelPlay-QX3.exe`** again (or **`install-driver.bat`** if you use the Python folder).
-4. In **Device Manager**, look for the device. After WinUSB it often appears under **Universal Serial Bus devices**.
-5. Unplug, wait 5 seconds, plug back in, then start the viewer again.
+1. Confirm the microscope is connected.
+2. Run `install-driver-qx5.bat` as administrator.
+3. Check Device Manager for USB device `093A:050F` using WinUSB.
+4. Try a direct USB port instead of a hub, then restart `run.bat`.
 
-### Windows will not install the driver / unsigned driver warning
+### The image is black, frozen, or stale
 
-- Click **Yes** when Windows asks for administrator permission.
-- If a Windows driver warning appears, choose **Install anyway**.
-- You do **not** need Test Signing.
-- Do not install the original 1999 `stvqx3` kernel driver on 64-bit Windows.
+Turn on one illuminator and watch the stream indicator. If the indicator
+reports a stream error or stale frame, unplug and reconnect the microscope and
+restart the viewer.
 
-### Python was not found
+### Python or dependency setup fails
 
-If you are using **`IntelPlay-QX3.exe`**, Python is not required. If you are using **`run.bat`**, install Python from [python.org](https://www.python.org/downloads/) and tick **Add python.exe to PATH**.
+Confirm that Python is available with:
 
-### `pip` / package install failed
+```powershell
+python --version
+```
 
-Only applies to **`run.bat`**. Connect to the internet and run it again, or: `python -m pip install -r requirements.txt`
-
-### Live video is black, frozen, or very slow
-
-1. Turn **Top** or **Bottom** lighting on.
-2. Raise **Gain** and **Exp**.
-3. Unplug other busy USB devices.
-4. After a resolution change, wait for **Please wait...** to clear.
-5. Unplug the microscope, plug it in again, and restart the viewer.
-
-### Lights do not turn on
-
-Power comes from USB. Use a direct port on the computer. Toggle **Top** / **Bottom** after the live image has started.
-
-## Building the `.exe` (developers)
-
-From this folder, double-click **`build.bat`**. The result is **`dist\IntelPlay-QX3.exe`** (often 70+ MB because OpenCV is bundled). That file is self-contained: driver install plus viewer. You can attach it to a GitHub Release; it is not committed to git.
-
-> **Note:** `build.bat`, `qx3.spec`, `src/qx3_launch.py`, and `src/winusb_install.py` are referenced above and in the layout below as the intended `.exe`-packaging path, but are not yet present in this checkout - only `src/qx3_gui.py` plus the two `.bat` launchers exist today. The "Option A - standalone .exe" quick start and the release download link describe the target design, not the current working tree.
+Then remove and recreate `.venv` only if it is incomplete, and run the launcher
+again. The `.venv` directory is local development state and is ignored by Git.
 
 ## Repository layout
 
@@ -143,56 +96,25 @@ From this folder, double-click **`build.bat`**. The result is **`dist\IntelPlay-
 ├── README.md
 ├── LICENSE
 ├── requirements.txt
-├── IntelPlay-QX3.exe       After build.bat: dist\IntelPlay-QX3.exe
-├── run.bat                 Python launcher (optional)
-├── install-driver.bat      Python-folder WinUSB installer (optional)
-├── build.bat               Build the standalone .exe
-├── qx3.spec
-├── src/qx3_launch.py       .exe entry (driver + viewer)
-├── src/qx3_gui.py
-├── src/winusb_install.py
-└── drivers/qx3_winusb.inf
+├── run.bat                 Default QX5 launcher
+├── run-qx5.bat             Explicit QX5 launcher
+├── install-driver-qx5.bat  WinUSB installer
+├── drivers/qx5_winusb.inf
+├── src/qx5_driver.py       MR97113 protocol and frame decoding
+├── src/qx5_capture.py      GUI-agnostic capture scheduler
+├── src/qx5_library.py      Session reader
+├── src/qx5_gui.py          Tkinter viewer
+└── tests/                  Unit and GUI-library tests
 ```
 
-## QX5 support (in progress)
+## Current limitations
 
-The repo folder is named `QX5Scope`, but everything above is written specifically for the original **QX3** (Intel/CPiA chip, USB `0813:0001`). The QX5 - Digital Blue's successor microscope - is **different hardware** and is not yet supported by `qx3_gui.py`. This section tracks that separate, in-progress effort.
+- There is no standalone executable package yet; the supported path is the
+  Python launcher.
+- The sensor's gain/exposure controls are still represented by the fixed
+  initialization values.
+- Illuminators are modeled as on/off controls, with one light selected at a
+  time.
 
-### Hardware identified
-
-The QX5 enumerates as **USB `093A:050F`** ("1.3M PC-CAM" - that string is just its USB product-string descriptor), a **PixArt / Mars-Semi MR97113** JPEG webcam ASIC, `bDeviceClass 0xFF` (vendor-specific - Windows has no built-in driver for it, so it needs the same WinUSB-binding approach as the QX3).
-
-This chip is documented and has a full open-source Linux driver: [`drivers/media/usb/gspca/mars.c`](https://github.com/torvalds/linux/blob/master/drivers/media/usb/gspca/mars.c) (gspca_mars, by Michel Xhaard / Jean-Francois Moine). That driver is the authoritative protocol reference for everything below - no blind reverse-engineering was needed.
-
-### Protocol summary (from gspca_mars)
-
-- All commands are byte sequences written to **bulk-OUT endpoint `0x04`** (no vendor control transfers, unlike the QX3's CPiA protocol).
-- Init = a handful of MR97113 register writes (frame size, gamma, frame-buffer size, brightness/saturation, sharpness), then 32 `mi_w` writes (`[0x1f, 0x00, addr, value]`) to program the image sensor, then `[0x00, 0x4d]` to enable isochronous streaming.
-- Lights: `[0x22, byte]` - `0x76` = top on, `0x7a` = bottom on, `0x7e` = both off. (Only one-at-a-time is modeled in the Linux driver; whether both LEDs can be on simultaneously, e.g. via `0x72`, hasn't been tested yet.)
-- Video is **JPEG**, not raw YUV like the QX3. The camera streams raw JPEG *scan* data only (no SOI/DQT/DHT/SOF0/SOS) framed by a sync marker (`FF FF 00 FF 96 6[4-7]`); a synthetic JPEG header + quant/Huffman tables (ported from gspca's `jpeg.h`) must be prepended to each frame before any normal JPEG decoder can read it.
-
-### Status as of 2026-08-27
-
-`src/qx5_gui.py` is built and working, validated end-to-end against real hardware - the QX5 now has its own standalone tkinter viewer (run with `py -3 src/qx5_gui.py` from this folder; not yet wired into `run.bat` or the `.exe` build):
-
-- WinUSB binds cleanly to `093A:050F` (`drivers/qx5_winusb.inf`, `install-driver-qx5.bat`).
-- `src/qx5_driver.py` - the Mars97113 protocol module (ported from `mars.c`): device init, LED/brightness/saturation/sharpness/gamma register writes, isochronous frame splitting, and JPEG-header patch + decode. Unit tested (`tests/test_qx5_driver.py`).
-- `src/qx5_gui.py` - live preview (rendered at 2x on-screen for visibility on high-DPI displays; captures/snapshots stay at native 320x240), Top/Bottom light checkboxes, Brightness/Saturation/Sharpness/Gamma sliders, and a Snapshot button (with the same shutter-click sound as `qx3_gui.py`) - all confirmed working against the physical microscope.
-- Timed Capture panel: schedule a snapshot sequence by interval + either a frame count or a total duration, with a shutter click on every captured frame; each run is saved to its own `media/<timestamp>/` folder with `frame_*.jpg` stills, a `session.json` (settings + outcome), and (via OpenCV) a rendered `movie.mp4`. Scheduling logic lives in `src/qx5_capture.py`, independent of the GUI and unit tested (`tests/test_qx5_capture.py`).
-- Library window ("Library..." button): browse past capture sessions, play a session's `movie.mp4` in the OS's default video player, or open its folder in Explorer. Session listing lives in `src/qx5_library.py`, unit tested (`tests/test_qx5_library.py`, `tests/test_qx5_gui_library.py`).
-
-Known gaps:
-
-- The sensor's default gain/exposure, baked into the fixed `mi_data` init block from `mars.c`, is still conservative for typical ambient/LED lighting - the Brightness/Saturation/Sharpness/Gamma sliders help, but there is no dedicated exposure/gain control yet.
-- LED control is on/off only (no PWM/dimming register exists in the ported protocol) - the image adjustment sliders are the intended substitute for brightness control, not a missing feature.
-
-### Next steps
-
-- Confirm whether both illuminators can be lit simultaneously.
-- Package `qx5_gui.py` into a standalone `.exe` (mirrors the same packaging gap noted above for `qx3_gui.py`) and wire it into `run.bat`/`install-driver-qx5.bat`.
-- Consider backporting the timed-capture and library feature set into `qx3_gui.py` (explicitly out of scope for the work done so far).
-- An original QX5 install disk exists but only has a 32-bit driver, so it can't run on this 64-bit host directly; a 32-bit VM with USB passthrough plus USBPcap could capture authentic traffic later if anything above needs cross-checking, but wasn't needed for the work done so far.
-
-## Disclaimer
-
-This is an independent open-source revival project. It is not affiliated with, endorsed by, or supported by Intel Corporation, Mattel, or Digital Blue. Intel Play, QX3, and QX5 are used only to identify the hardware this software talks to. Use at your own risk.
+This is an independent open-source revival project and is not affiliated with
+Digital Blue or Mattel. Use at your own risk.

@@ -13,20 +13,12 @@ import time
 
 import usb.core
 import usb.util
-import usb.backend.libusb1 as usb_libusb1
+
+sys.path.insert(0, os.path.dirname(__file__))
+from usb_transport import get_libusb_backend  # noqa: E402
 
 VID = 0x093A
 PID = 0x050F
-
-
-def find_libusb_dll():
-    import libusb
-    pkg_dir = os.path.dirname(libusb.__file__)
-    for root, dirs, files in os.walk(pkg_dir):
-        for f in files:
-            if f.lower() == "libusb-1.0.dll" and "x86_64" in root:
-                return os.path.join(root, f)
-    return None
 
 
 def hexdump(data, n=32):
@@ -62,8 +54,11 @@ def try_read_ep(ep, size, label):
 
 
 def main():
-    dll = find_libusb_dll()
-    backend = usb_libusb1.get_backend(find_library=lambda x: dll)
+    try:
+        backend = get_libusb_backend()
+    except RuntimeError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
     dev = usb.core.find(idVendor=VID, idProduct=PID, backend=backend)
     if dev is None:
         print("Device not found.")

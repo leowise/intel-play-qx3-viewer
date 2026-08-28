@@ -4,13 +4,14 @@ import sys
 import tempfile
 import time
 import unittest
+from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from PIL import Image
 
 import qx5_capture
-from qx5_capture import CaptureSession
+from qx5_capture import CaptureSession, FrameSample
 
 
 def make_test_image(color=(255, 0, 0)):
@@ -27,6 +28,20 @@ class TestCaptureSessionValidation(unittest.TestCase):
     def test_rejects_non_positive_interval(self):
         with self.assertRaises(ValueError):
             CaptureSession("root", interval_s=0, count=1)
+
+    def test_rejects_non_positive_capture_limits(self):
+        with self.assertRaises(ValueError):
+            CaptureSession("root", interval_s=1.0, count=0)
+        with self.assertRaises(ValueError):
+            CaptureSession("root", interval_s=1.0, duration_s=0)
+        with self.assertRaises(ValueError):
+            CaptureSession("root", interval_s=1.0, count=1, video_fps=0)
+
+    def test_rejects_non_positive_freshness_limits(self):
+        with self.assertRaises(ValueError):
+            CaptureSession("root", interval_s=1.0, count=1, max_frame_age_s=0)
+        with self.assertRaises(ValueError):
+            CaptureSession("root", interval_s=1.0, count=1, max_consecutive_misses=0)
 
 
 class TestCaptureSessionRun(unittest.TestCase):
@@ -77,8 +92,22 @@ class TestCaptureSessionRun(unittest.TestCase):
         with open(os.path.join(session.session_dir, "session.json")) as f:
             meta = json.load(f)
         self.assertTrue(meta["interrupted"])
+        self.assertEqual(meta["termination_reason"], "user_stopped")
         self.assertGreater(meta["frame_count"], 0)
         self.assertLess(meta["frame_count"], 1000)
+
+    def test_stop_can_request_non_blocking_finalization(self):
+        session = CaptureSession(self.root, interval_s=0.02, count=1000)
+        session.start(lambda: make_test_image())
+        time.sleep(0.05)
+
+        result = session.stop(wait=False)
+        self.assertFalse(result)
+        self._wait_until_done(session)
+
+        with open(os.path.join(session.session_dir, "session.json")) as f:
+            meta = json.load(f)
+        self.assertEqual(meta["termination_reason"], "user_stopped")
 
     def test_none_frames_are_skipped_not_saved(self):
         calls = {"n": 0}
@@ -95,6 +124,96 @@ class TestCaptureSessionRun(unittest.TestCase):
             meta = json.load(f)
         self.assertEqual(meta["frame_count"], 1)
         self.assertEqual(meta["skipped_ticks"], 1)
+
+    def test_repeated_frame_sample_stops_count_capture(self):
+        sample = FrameSample(make_test_image(), sequence=1, captured_at=time.monotonic())
+        session = CaptureSession(
+            self.root, interval_s=0.01, count=100,
+            max_consecutive_misses=2,
+        )
+        session.start(lambda: sample)
+        self._wait_until_done(session)
+
+        with open(os.path.join(session.session_dir, "session.json")) as f:
+            meta = json.load(f)
+        self.assertEqual(meta["frame_count"], 1)
+        self.assertTrue(meta["interrupted"])
+        self.assertEqual(meta["termination_reason"], "no_fresh_frames")
+
+    def test_expired_frame_sample_is_not_saved(self):
+        sample = FrameSample(
+            make_test_image(), sequence=1,
+            captured_at=time.monotonic() - 60,
+        )
+        session = CaptureSession(
+            self.root, interval_s=0.01, count=1,
+            max_frame_age_s=1.0, max_consecutive_misses=2,
+        )
+        session.start(lambda: sample)
+        self._wait_until_done(session)
+
+        with open(os.path.join(session.session_dir, "session.json")) as f:
+            meta = json.load(f)
+        self.assertEqual(meta["frame_count"], 0)
+        self.assertEqual(meta["termination_reason"], "no_fresh_frames")
+
+    def test_capture_provider_error_is_persisted(self):
+        def provider():
+            raise RuntimeError("camera read failed")
+
+        session = CaptureSession(self.root, interval_s=0.01, count=1)
+        session.start(provider)
+        self._wait_until_done(session)
+
+        with open(os.path.join(session.session_dir, "session.json")) as f:
+            meta = json.load(f)
+        self.assertTrue(meta["interrupted"])
+        self.assertEqual(meta["termination_reason"], "error")
+        self.assertEqual(meta["error_stage"], "capture")
+        self.assertIn("camera read failed", meta["error"])
+
+    def test_core_metadata_cannot_be_overwritten(self):
+        session = CaptureSession(self.root, interval_s=0.01, count=1)
+        session.start(
+            lambda: make_test_image(),
+            extra_metadata={
+                "frame_count": 999,
+                "termination_reason": "fake",
+                "led_top": True,
+            },
+        )
+        self._wait_until_done(session)
+
+        with open(os.path.join(session.session_dir, "session.json")) as f:
+            meta = json.load(f)
+        self.assertEqual(meta["frame_count"], 1)
+        self.assertEqual(meta["termination_reason"], "completed")
+        self.assertGreaterEqual(meta["duration_s"], 0)
+        self.assertTrue(meta["led_top"])
+
+    def test_session_directory_allocation_is_collision_safe(self):
+        session = CaptureSession(self.root, interval_s=1.0, count=1)
+        session._started_at = datetime(2026, 8, 28, 12, 0, 0, 123456)
+        first = session._create_session_dir()
+        second = session._create_session_dir()
+        self.assertNotEqual(first, second)
+        self.assertTrue(os.path.isdir(first))
+        self.assertTrue(os.path.isdir(second))
+
+    def test_video_render_error_is_persisted(self):
+        session = CaptureSession(self.root, interval_s=0.01, count=1)
+
+        def fail_render(_filename):
+            raise RuntimeError("encoder crashed")
+
+        session._render_video = fail_render
+        session.start(lambda: make_test_image())
+        self._wait_until_done(session)
+
+        with open(os.path.join(session.session_dir, "session.json")) as f:
+            meta = json.load(f)
+        self.assertTrue(meta["video_render_failed"])
+        self.assertIn("encoder crashed", meta["video_render_error"])
 
     def test_extra_metadata_is_merged_into_session_json(self):
         session = CaptureSession(self.root, interval_s=0.01, count=1)

@@ -14,10 +14,9 @@ import time
 
 import usb.core
 import usb.util
-import usb.backend.libusb1 as usb_libusb1
 
 sys.path.insert(0, os.path.dirname(__file__))
-from qx3_gui import IsoPump, find_libusb_dll  # noqa: E402
+from usb_transport import IsoPump, get_libusb_backend  # noqa: E402
 from qx5_driver import VID, PID, Mars97113  # noqa: E402
 
 
@@ -27,8 +26,7 @@ def hexdump(data, n=64):
 
 
 def main():
-    dll = find_libusb_dll()
-    backend = usb_libusb1.get_backend(find_library=lambda x: dll)
+    backend = get_libusb_backend()
     dev = usb.core.find(idVendor=VID, idProduct=PID, backend=backend)
     if dev is None:
         print("Device not found.")
